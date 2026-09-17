@@ -1,6 +1,6 @@
 /* eslint-disable no-dupe-keys */
 import React, { useState, useEffect } from 'react';
-import { FaUsers, FaCalendarCheck, FaChartBar, FaDownload, FaPlus, FaSearch, FaTimes, FaMoneyBillWave, FaSignOutAlt } from 'react-icons/fa';
+import { FaUsers, FaCalendarCheck, FaChartBar, FaDownload, FaPlus, FaSearch, FaTimes, FaMoneyBillWave, FaSignOutAlt, FaUserPlus } from 'react-icons/fa';
 
 const NAVY = "#0A1931";
 const NAVY_LIGHT = "#12264A";
@@ -22,6 +22,15 @@ export default function App() {
   const [members, setMembers] = useState(() => { const s = localStorage.getItem('patama_members'); return s ? JSON.parse(s) : defaultMembers; });
   const [attendance, setAttendance] = useState(() => { const s = localStorage.getItem('patama_attendance'); return s ? JSON.parse(s) : {}; });
   const [offerings, setOfferings] = useState(() => { const s = localStorage.getItem('patama_offerings'); return s ? JSON.parse(s) : [{ id: 1, date: '2026-08-21', type: 'Offering', amount: 8500, member: 'Sunday Service', method: 'Cash' }, { id: 2, date: '2026-08-21', type: 'Tithe', amount: 3200, member: 'John Mwangi', method: 'M-Pesa' }]; });
+
+  // VISITORS STATE
+  const [visitors, setVisitors] = useState(() => { const s = localStorage.getItem('patama_visitors'); return s ? JSON.parse(s) : []; });
+  const [selectedVisitor, setSelectedVisitor] = useState(null);
+  const [showVisitorModal, setShowVisitorModal] = useState(false);
+  const [visitorFilter, setVisitorFilter] = useState("");
+  const [visitorSearch, setVisitorSearch] = useState("");
+  const [visitorTabInner, setVisitorTabInner] = useState("overview");
+
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState("");
   const [showAdd, setShowAdd] = useState(false);
@@ -36,6 +45,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('patama_members', JSON.stringify(members)); }, [members]);
   useEffect(() => { localStorage.setItem('patama_attendance', JSON.stringify(attendance)); }, [attendance]);
   useEffect(() => { localStorage.setItem('patama_offerings', JSON.stringify(offerings)); }, [offerings]);
+  useEffect(() => { localStorage.setItem('patama_visitors', JSON.stringify(visitors)); }, [visitors]);
 
   const dayRecord = attendance[selectedDate] || {};
   const getTodayStatus = (id) => dayRecord[id] || "Absent";
@@ -61,6 +71,72 @@ export default function App() {
   const statusColor = (s) => s === "Present" ? "#dcfce7" : s === "Late" ? "#fef3c7" : s === "Active" ? "#dcfce7" : "#fee2e2";
   const statusTextColor = (s) => s === "Present" ? "#16a34a" : s === "Late" ? "#d97706" : s === "Active" ? "#16a34a" : "#dc2626";
 
+  // VISITOR FUNCTIONS
+  const openNewVisitor = () => {
+    setSelectedVisitor({
+      id: Date.now(),
+      visitDate: new Date().toISOString().split('T')[0],
+      fullName: "",
+      phoneNumber: "",
+      email: "",
+      maritalStatus: "",
+      bornAgain: "Yes",
+      residence: "",
+      source: "",
+      wantsToJoin: "",
+      status: "New",
+      notes: "",
+      ministry: ""
+    });
+    setVisitorTabInner("overview");
+    setShowVisitorModal(true);
+  };
+
+  const openEditVisitor = (v) => {
+    setSelectedVisitor(v);
+    setVisitorTabInner("overview");
+    setShowVisitorModal(true);
+  };
+
+  const saveVisitor = () => {
+    if (!selectedVisitor.fullName) return alert("Full name required");
+    if (selectedVisitor.wantsToJoin === "Yes") {
+      // MOVE TO MEMBERS
+      const newMemberFromVisitor = {
+        id: Date.now(),
+        name: selectedVisitor.fullName,
+        role: "Member",
+        phone: selectedVisitor.phoneNumber,
+        group: selectedVisitor.ministry || "Choir",
+        status: "Active",
+        email: selectedVisitor.email,
+        dateJoined: new Date().toISOString().split('T')[0],
+        photo: null,
+        emergency: { name: "", relation: "", phone: "" },
+        family: [],
+        fromVisitor: true,
+        residence: selectedVisitor.residence
+      };
+      setMembers([...members, newMemberFromVisitor]);
+      setVisitors(visitors.filter(v => v.id !== selectedVisitor.id));
+      alert(selectedVisitor.fullName + " converted to Member!");
+    } else {
+      const exists = visitors.find(v => v.id === selectedVisitor.id);
+      if (exists) {
+        setVisitors(visitors.map(v => v.id === selectedVisitor.id ? selectedVisitor : v));
+      } else {
+        setVisitors([...visitors, selectedVisitor]);
+      }
+    }
+    setShowVisitorModal(false);
+  };
+
+  const filteredVisitors = visitors.filter(v => {
+    const matchSearch = v.fullName.toLowerCase().includes(visitorSearch.toLowerCase()) || v.phoneNumber.includes(visitorSearch) || v.residence.toLowerCase().includes(visitorSearch.toLowerCase());
+    const matchFilter = visitorFilter === "" || v.wantsToJoin === visitorFilter;
+    return matchSearch && matchFilter;
+  });
+
   if (!isLoggedIn) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: NAVY }}>
@@ -79,6 +155,7 @@ export default function App() {
       <div style={{ width: 260, background: NAVY, color: WHITE, padding: 20, borderRadius: 16, margin: 10, height: 'fit-content', position: 'sticky', top: 10 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 30 }}><div style={{ width: 40, height: 40, background: GOLD, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: NAVY }}>P</div><div><div style={{ fontWeight: 700, fontSize: 18 }}>Patama</div><div style={{ fontSize: 12, color: GOLD }}>CMS</div></div></div>
         <div onClick={() => setTab("members")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "members" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "members" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "members" ? GOLD : WHITE }}><FaUsers /> Members</div>
+        <div onClick={() => setTab("visitors")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "visitors" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "visitors" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "visitors" ? GOLD : WHITE }}><FaUserPlus /> Visitors {visitors.length > 0 && <span style={{ background: GOLD, color: NAVY, fontSize: 10, padding: '2px 6px', borderRadius: 10, marginLeft: 'auto' }}>{visitors.length}</span>}</div>
         <div onClick={() => setTab("attendance")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "attendance" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "attendance" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "attendance" ? GOLD : WHITE }}><FaCalendarCheck /> Attendance</div>
         <div onClick={() => setTab("reports")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "reports" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "reports" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "reports" ? GOLD : WHITE }}><FaChartBar /> Reports</div>
         <div onClick={() => setTab("offering")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "offering" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "offering" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "offering" ? GOLD : WHITE }}><FaMoneyBillWave /> Offering & Tithe</div>
@@ -87,7 +164,14 @@ export default function App() {
       </div>
 
       <div style={{ flex: 1, padding: 30 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}><div><div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>PATAMA CMS</div><h1 style={{ margin: 0, color: NAVY }}>{tab === "members" ? "Members" : tab === "attendance" ? "Attendance Sheet" : tab === "reports" ? "Reports" : "Offering & Tithe"}</h1></div><div style={{ display: 'flex', gap: 10 }}><button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button><button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button></div></div>
+        <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}><div><div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>PATAMA CMS</div><h1 style={{ margin: 0, color: NAVY }}>{tab === "members" ? "Members" : tab === "visitors" ? "Visitors" : tab === "attendance" ? "Attendance Sheet" : tab === "reports" ? "Reports" : "Offering & Tithe"}</h1></div>
+          <div style={{ display: 'flex', gap: 10 }}>
+            {tab === "visitors" ? <button onClick={openNewVisitor} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add Visitor</button> :
+              <>
+                <button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button>
+                <button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button>
+              </>}
+          </div></div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 20 }}>
           <div style={{ background: WHITE, padding: 16, borderRadius: 12, borderLeft: `4px solid ${NAVY}` }}><div style={{ fontSize: 12, color: '#888' }}>Active members</div><div style={{ fontSize: 28, fontWeight: 700 }}>{activeMembers.length}</div><div style={{ fontSize: 10, color: '#888' }}>of {members.length} total</div></div>
@@ -95,6 +179,25 @@ export default function App() {
           <div style={{ background: WHITE, padding: 16, borderRadius: 12, borderLeft: `4px solid ${GOLD}` }}><div style={{ fontSize: 12, color: '#888' }}>Late</div><div style={{ fontSize: 28, fontWeight: 700, color: '#8B6914' }}>{lateCount}</div></div>
           <div style={{ background: WHITE, padding: 16, borderRadius: 12, borderLeft: `4px solid #ef4444` }}><div style={{ fontSize: 12, color: '#888' }}>Absent</div><div style={{ fontSize: 28, fontWeight: 700, color: '#ef4444' }}>{absentCount}</div></div>
         </div>
+
+        {/* VISITORS TAB */}
+        {tab === "visitors" && (
+          <div>
+            <div style={{ display: 'flex', gap: 10, background: WHITE, padding: 10, borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}><FaSearch style={{ color: GOLD }} /><input placeholder="Search visitors" value={visitorSearch} onChange={e => setVisitorSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%' }} /></div>
+              <select value={visitorFilter} onChange={e => setVisitorFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${GOLD}40` }}>
+                <option value="">All - Wants to Join</option>
+                <option value="Yes">Yes</option>
+                <option value="No">No</option>
+                <option value="Unsure">Unsure</option>
+              </select>
+            </div>
+            <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>RESIDENCE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>WANTS TO JOIN?</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>ACTION</th></tr></thead>
+                <tbody>{filteredVisitors.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors yet. Click Add Visitor</td></tr> : filteredVisitors.map(v => (<tr key={v.id} style={{ borderTop: '1px solid #eee' }}><td style={{ padding: 12, fontWeight: 600 }}>{v.fullName}</td><td style={{ padding: 12 }}>{v.visitDate}</td><td style={{ padding: 12 }}>{v.phoneNumber}</td><td style={{ padding: 12 }}>{v.residence}</td><td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.wantsToJoin === 'Yes' ? '#dcfce7' : v.wantsToJoin === 'No' ? '#f3f4f6' : v.wantsToJoin === 'Unsure' ? '#fef3c7' : '#eee', color: v.wantsToJoin === 'Yes' ? '#16a34a' : v.wantsToJoin === 'No' ? '#666' : '#d97706' }}>{v.wantsToJoin || "-"}</span></td><td style={{ padding: 12 }}><button onClick={() => openEditVisitor(v)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>View</button></td></tr>))}</tbody></table>
+            </div>
+          </div>
+        )}
 
         {tab === "attendance" && (
           <div style={{ background: WHITE, padding: 20, borderRadius: 12 }}>
@@ -156,6 +259,60 @@ export default function App() {
       </div>
 
       {showAdd && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}><div style={{ background: WHITE, padding: 24, borderRadius: 16, width: 400, borderTop: `4px solid ${GOLD}` }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}><h3 style={{ margin: 0, color: NAVY }}>Add Member</h3><button onClick={() => setShowAdd(false)} style={{ border: 'none', background: '#eee', borderRadius: 6, padding: 6 }}><FaTimes /></button></div><input placeholder="Full Name" value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #ccc' }} /><input placeholder="Phone" value={newMember.phone} onChange={e => setNewMember({ ...newMember, phone: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #ccc' }} /><select value={newMember.group} onChange={e => setNewMember({ ...newMember, group: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 16, borderRadius: 8, border: '1px solid #ccc' }}><option>Choir</option><option>Youth</option><option>Women</option><option>Men</option><option>Children</option></select><button onClick={addMember} style={{ width: '100%', background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: 12, borderRadius: 8, fontWeight: 700 }}>Add</button></div></div>)}
+
+      {/* VISITOR MODAL - EXACTLY LIKE YOUR SCREENSHOT */}
+      {showVisitorModal && selectedVisitor && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 10 }}>
+          <div style={{ background: WHITE, borderRadius: 16, width: '100%', maxWidth: 640, maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+            {/* Header like screenshot */}
+            <div style={{ background: NAVY, color: WHITE, padding: 16, display: 'flex', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <div style={{ width: 44, height: 44, borderRadius: '50%', background: '#4b5563', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, fontSize: 18 }}>{selectedVisitor.fullName?.charAt(0) || "S"}</div>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 16 }}>{selectedVisitor.fullName || "New Visitor"}</div>
+                  <div style={{ fontSize: 11, color: '#cbd5e1' }}>{selectedVisitor.phoneNumber || "No phone"} • -</div>
+                  <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 8 }}>
+                    <span style={{ background: 'rgba(255,255,255,0.15)', fontSize: 10, padding: '3px 8px', borderRadius: 20 }}>Visited: {selectedVisitor.visitDate || "7 Sept 2025"}</span>
+                    <span style={{ background: 'rgba(255,255,255,0.15)', fontSize: 10, padding: '3px 8px', borderRadius: 20 }}>Join: {selectedVisitor.wantsToJoin || "-"}</span>
+                    <span style={{ background: 'rgba(255,255,255,0.15)', fontSize: 10, padding: '3px 8px', borderRadius: 20 }}>Born Again: {selectedVisitor.bornAgain || "Yes"}</span>
+                    <span style={{ background: 'rgba(255,255,255,0.15)', fontSize: 10, padding: '3px 8px', borderRadius: 20 }}>Status: {selectedVisitor.status}</span>
+                    <span style={{ background: 'rgba(255,255,255,0.15)', fontSize: 10, padding: '3px 8px', borderRadius: 20 }}>Residence: {selectedVisitor.residence || "Kikuyu"}</span>
+                  </div>
+                </div>
+              </div>
+              <button onClick={() => setShowVisitorModal(false)} style={{ background: WHITE, color: NAVY, border: 'none', padding: '6px 12px', borderRadius: 8, height: 32, fontSize: 12, fontWeight: 700, cursor: 'pointer' }}>✕ CLOSE</button>
+            </div>
+
+            <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid #eee', padding: '0 20px' }}>
+              <button onClick={() => setVisitorTabInner("overview")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "overview" ? `2px solid ${NAVY}` : '2px solid transparent', fontWeight: visitorTabInner === "overview" ? 700 : 400, cursor: 'pointer', fontSize: 13 }}>☑ Overview</button>
+              <button onClick={() => setVisitorTabInner("notes")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "notes" ? `2px solid ${NAVY}` : '2px solid transparent', fontWeight: visitorTabInner === "notes" ? 700 : 400, cursor: 'pointer', fontSize: 13 }}>📄 Notes</button>
+            </div>
+
+            <div style={{ padding: 20, overflowY: 'auto', flex: 1, background: '#fdf8f0' }}>
+              {visitorTabInner === "overview" ? (
+                <>
+                  <div style={{ fontWeight: 700, fontSize: 12, marginBottom: 16, color: NAVY }}>☑ EDIT VISITOR DETAILS</div>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>VISIT DATE</label><input type="date" value={selectedVisitor.visitDate} onChange={e => setSelectedVisitor({ ...selectedVisitor, visitDate: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>FULL NAME</label><input value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="Sam Njenga" /></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>PHONE NUMBER</label><input value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="0722555533" /></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>EMAIL ADDRESS</label><input value={selectedVisitor.email} onChange={e => setSelectedVisitor({ ...selectedVisitor, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="Email" /></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select marital status</option><option>Single</option><option>Married</option><option>Divorced</option></select></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>BORN AGAIN?</label><select value={selectedVisitor.bornAgain} onChange={e => setSelectedVisitor({ ...selectedVisitor, bornAgain: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option>Yes</option><option>No</option></select></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>RESIDENCE</label><input value={selectedVisitor.residence} onChange={e => setSelectedVisitor({ ...selectedVisitor, residence: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="Kikuyu" /></div>
+                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>SOURCE</label><input value={selectedVisitor.source} onChange={e => setSelectedVisitor({ ...selectedVisitor, source: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="A friend" /></div>
+                    <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>WANTS TO JOIN? *</label><select value={selectedVisitor.wantsToJoin} onChange={e => setSelectedVisitor({ ...selectedVisitor, wantsToJoin: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: selectedVisitor.wantsToJoin === "Yes" ? `2px solid #16a34a` : `2px solid ${GOLD}`, marginTop: 4, fontSize: 13, fontWeight: 700 }}><option value="">Select</option><option value="Yes">Yes - Convert to Member</option><option value="No">No</option><option value="Unsure">Unsure - Follow up</option></select>{selectedVisitor.wantsToJoin === "Yes" && <div style={{ fontSize: 11, color: '#16a34a', marginTop: 4, fontWeight: 600 }}>Will be moved to Members on Save</div>}</div>
+                  </div>
+                  <div style={{ marginTop: 16, border: '1px solid #ddd', borderRadius: 10, padding: 12, background: WHITE, cursor: 'pointer' }}><div style={{ fontSize: 12, fontWeight: 700, color: NAVY }}>⛪ MINISTRIES & CELL GROUP (CLICK TO EXPAND)</div><input value={selectedVisitor.ministry} onChange={e => setSelectedVisitor({ ...selectedVisitor, ministry: e.target.value })} placeholder="e.g. Choir, Youth, Kalimoni Cell" style={{ width: '100%', marginTop: 8, padding: 8, borderRadius: 6, border: '1px solid #eee', fontSize: 12 }} /></div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 20 }}><button onClick={() => setShowVisitorModal(false)} style={{ padding: '10px 16px', borderRadius: 8, border: '1px solid #ccc', background: WHITE }}>Cancel</button><button onClick={saveVisitor} style={{ padding: '10px 20px', borderRadius: 8, background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, fontWeight: 700, cursor: 'pointer' }}>✓ SAVE CHANGES</button></div>
+                </>
+              ) : (
+                <div><label style={{ fontSize: 12, fontWeight: 700 }}>Follow-up Notes</label><textarea value={selectedVisitor.notes} onChange={e => setSelectedVisitor({ ...selectedVisitor, notes: e.target.value })} style={{ width: '100%', height: 200, padding: 12, borderRadius: 8, border: '1px solid #ccc', marginTop: 8, fontSize: 13 }} placeholder="Add follow-up notes... e.g. Called on Tuesday, promised to come Sunday"></textarea><div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 12 }}><button onClick={saveVisitor} style={{ padding: '10px 20px', borderRadius: 8, background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, fontWeight: 700 }}>Save Notes</button></div></div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showProfile && selectedMember && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(10,25,49,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 15 }}>
