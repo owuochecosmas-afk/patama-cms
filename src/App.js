@@ -1,6 +1,6 @@
-/* eslint-disable no-dupe-keys */
+/* eslint-disable no-dupe-keys, no-unused-vars */
 import React, { useState, useEffect } from 'react';
-import { FaUsers, FaCalendarCheck, FaChartBar, FaDownload, FaPlus, FaSearch, FaTimes, FaMoneyBillWave, FaSignOutAlt, FaUserPlus } from 'react-icons/fa';
+import { FaUsers, FaCalendarCheck, FaChartBar, FaDownload, FaPlus, FaSearch, FaTimes, FaMoneyBillWave, FaSignOutAlt, FaUserPlus, FaHistory, FaEyeSlash } from 'react-icons/fa';
 
 const NAVY = "#0A1931";
 const NAVY_LIGHT = "#12264A";
@@ -27,12 +27,15 @@ export default function App() {
   const [allVisitorsHistory, setAllVisitorsHistory] = useState(() => { const s = localStorage.getItem('patama_all_visitors_history'); return s ? JSON.parse(s) : []; });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
-  const [visitorFilter, setVisitorFilter] = useState("");
+  const [visitorFilter, setVisitorFilter] = useState(""); // kept but not shown under search
   const [visitorSearch, setVisitorSearch] = useState("");
   const [visitorTabInner, setVisitorTabInner] = useState("overview");
   const [newVisitForm, setNewVisitForm] = useState({ service: "Sunday Service", notes: "" });
   const [isNewVisitorMode, setIsNewVisitorMode] = useState(false);
   const [convertGroup, setConvertGroup] = useState("Choir");
+  const [showHistory, setShowHistory] = useState(false);
+  const [showHistoryPage, setShowHistoryPage] = useState(false);
+  const [monthFilter, setMonthFilter] = useState("All");
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState("");
@@ -74,8 +77,8 @@ export default function App() {
   const filtered = members.filter(m => m.name.toLowerCase().includes(search.toLowerCase()) || m.group.toLowerCase().includes(search.toLowerCase()));
   const statusColor = (s) => s === "Present" ? "#dcfce7" : s === "Late" ? "#fef3c7" : s === "Active" ? "#dcfce7" : "#fee2e2";
   const statusTextColor = (s) => s === "Present" ? "#16a34a" : s === "Late" ? "#d97706" : s === "Active" ? "#16a34a" : "#dc2626";
-
   const getMonthName = (dateStr) => { if (!dateStr) return "-"; const d = new Date(dateStr); return d.toLocaleString('default', { month: 'short', year: 'numeric' }); };
+  const getMonthOnly = (dateStr) => { if (!dateStr) return ""; const d = new Date(dateStr); return d.toLocaleString('default', { month: 'long' }); };
 
   const openNewVisitor = () => {
     const sysdate = new Date().toISOString().split('T')[0];
@@ -127,18 +130,24 @@ export default function App() {
       dateJoined: new Date().toISOString().split('T')[0], photo: null, emergency: { name: "", relation: "", phone: "" }, family: [], fromVisitor: true, residence: selectedVisitor.residence
     };
     setMembers([...members, newMemberFromVisitor]);
-    // DELETE from visitors list but KEEP in history as Member now
     setVisitors(visitors.filter(v => v.id !== selectedVisitor.id));
-    setAllVisitorsHistory(allVisitorsHistory.map(v => v.id === selectedVisitor.id ? { ...v, isConverted: true, convertedDate: new Date().toISOString().split('T')[0], convertedGroup: convertGroup, status: "Member now", wantsToJoin: v.wantsToJoin } : v));
+    setAllVisitorsHistory(allVisitorsHistory.map(v => v.id === selectedVisitor.id ? { ...v, isConverted: true, convertedDate: new Date().toISOString().split('T')[0], convertedGroup: convertGroup, status: "Member now" } : v));
     setShowVisitorModal(false);
-    alert(selectedVisitor.fullName + " converted to " + convertGroup + " and removed from Visitors list but still in Visitors Count history.");
   };
 
+  // SEARCH ONLY - no Wants to Join dropdown
   const filteredVisitors = visitors.filter(v => {
-    const matchSearch = v.fullName.toLowerCase().includes(visitorSearch.toLowerCase()) || v.phoneNumber.includes(visitorSearch) || v.residence.toLowerCase().includes(visitorSearch.toLowerCase());
-    const matchFilter = visitorFilter === "" || v.wantsToJoin === visitorFilter;
-    return matchSearch && matchFilter;
+    return v.fullName.toLowerCase().includes(visitorSearch.toLowerCase()) || v.phoneNumber.includes(visitorSearch) || v.residence.toLowerCase().includes(visitorSearch.toLowerCase());
   });
+
+  // MONTH FILTER FOR HISTORY
+  const filteredHistory = allVisitorsHistory.filter(v => {
+    if (monthFilter === "All") return true;
+    const month = getMonthOnly(v.visitDate);
+    return month === monthFilter;
+  });
+
+  const monthsList = ["All", "January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
   if (!isLoggedIn) {
     return (
@@ -169,8 +178,15 @@ export default function App() {
       <div style={{ flex: 1, padding: 30 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}><div><div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>PATAMA CMS</div><h1 style={{ margin: 0, color: NAVY }}>{tab === "members" ? "Members" : tab === "visitors" ? "Visitors" : tab === "attendance" ? "Attendance Sheet" : tab === "reports" ? "Reports" : "Offering & Tithe"}</h1></div>
           <div style={{ display: 'flex', gap: 10 }}>
-            {tab === "visitors" ? <button onClick={openNewVisitor} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add Visitor</button> :
-              <><button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button><button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button></>}
+            {tab === "visitors" && (
+              <>
+                <button onClick={() => setShowHistoryPage(true)} style={{ background: WHITE, color: NAVY, border: `1px solid ${GOLD}`, padding: '10px 14px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', fontWeight: 700, fontSize: 13 }}>
+                  <FaHistory /> Hide History <span style={{ background: GOLD, color: NAVY, fontSize: 10, padding: '2px 6px', borderRadius: 10 }}>{allVisitorsHistory.length}</span>
+                </button>
+                <button onClick={openNewVisitor} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add Visitor</button>
+              </>
+            )}
+            {tab !== "visitors" && <><button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button><button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button></>}
           </div></div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -184,42 +200,45 @@ export default function App() {
           <div>
             <div style={{ display: 'flex', gap: 10, background: WHITE, padding: 10, borderRadius: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}><FaSearch style={{ color: GOLD }} /><input placeholder="Search visitors" value={visitorSearch} onChange={e => setVisitorSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%' }} /></div>
-              <select value={visitorFilter} onChange={e => setVisitorFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${GOLD}40` }}>
-                <option value="">All - Wants to Join</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option>
-              </select>
+              {/* DROPDOWN REMOVED AS REQUESTED - NO All Wants to Join here */}
             </div>
 
-            {/* MAIN VISITORS LIST - ACTIVE ONLY */}
-            <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto', marginBottom: 24 }}>
-              <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: 12, color: NAVY, background: '#F8F6F1', borderBottom: '1px solid #eee' }}>ACTIVE VISITORS LIST - {filteredVisitors.length} visitors (converted are deleted from here)</div>
+            <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto', marginBottom: 16 }}>
+              <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: 12, color: NAVY, background: '#F8F6F1', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
+                <span>ACTIVE VISITORS LIST - {filteredVisitors.length} visitors (converted are deleted from here)</span>
+                <span style={{ color: GOLD, cursor: 'pointer' }} onClick={() => setShowHistory(!showHistory)}><FaHistory /> {showHistory ? "Hide All Time History" : "Show All Time History"} ({allVisitorsHistory.length})</span>
+              </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>RESIDENCE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>WANTS TO JOIN?</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>ACTION</th></tr></thead>
-                <tbody>{filteredVisitors.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No active visitors. When converted they are deleted from here but remain in count below.</td></tr> : filteredVisitors.map(v => (<tr key={v.id} style={{ borderTop: '1px solid #eee' }}><td style={{ padding: 12, fontWeight: 600, fontSize: 13 }}>{v.fullName}</td><td style={{ padding: 12, fontSize: 12 }}>{v.visitDate}</td><td style={{ padding: 12, fontSize: 12 }}>{v.phoneNumber}</td><td style={{ padding: 12, fontSize: 12 }}>{v.residence}</td><td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.wantsToJoin === 'Yes' ? '#dcfce7' : '#fef3c7' }}>{v.wantsToJoin || "-"}</span></td><td style={{ padding: 12 }}><button onClick={() => openEditVisitor(v)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>View</button></td></tr>))}</tbody></table>
+                <tbody>{filteredVisitors.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No active visitors. Click Add Visitor or click All Time History to see all visitors ever.</td></tr> : filteredVisitors.map(v => (<tr key={v.id} style={{ borderTop: '1px solid #eee' }}><td style={{ padding: 12, fontWeight: 600, fontSize: 13 }}>{v.fullName}</td><td style={{ padding: 12, fontSize: 12 }}>{v.visitDate}</td><td style={{ padding: 12, fontSize: 12 }}>{v.phoneNumber}</td><td style={{ padding: 12, fontSize: 12 }}>{v.residence}</td><td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.wantsToJoin === 'Yes' ? '#dcfce7' : '#fef3c7' }}>{v.wantsToJoin || "-"}</span></td><td style={{ padding: 12 }}><button onClick={() => openEditVisitor(v)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>View</button></td></tr>))}</tbody></table>
             </div>
 
-            {/* VISITORS COUNT - BELOW SEARCH - ALL TIME HISTORY */}
-            <div style={{ background: WHITE, borderRadius: 12, padding: 16, border: `2px solid ${GOLD}40` }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
-                <div><div style={{ fontWeight: 800, fontSize: 14, color: NAVY }}>VISITORS COUNT - ALL TIME HISTORY</div><div style={{ fontSize: 11, color: '#888' }}>Shows all visitors we've had even if converted to members • Total: {allVisitorsHistory.length} • Now Members: {allVisitorsHistory.filter(v => v.isConverted).length} • Not yet: {allVisitorsHistory.filter(v => !v.isConverted).length}</div></div>
-                <div style={{ display: 'flex', gap: 8 }}>
-                  <div style={{ background: NAVY, color: GOLD, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Total Ever: {allVisitorsHistory.length}</div>
-                  <div style={{ background: '#dcfce7', color: '#16a34a', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Member now: {allVisitorsHistory.filter(v => v.isConverted).length}</div>
-                  <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Not yet: {allVisitorsHistory.filter(v => !v.isConverted).length}</div>
+            {showHistory && (
+              <div style={{ background: WHITE, borderRadius: 12, padding: 16, border: `2px solid ${GOLD}` }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+                  <div><div style={{ fontWeight: 800, fontSize: 14, color: NAVY }}><FaHistory style={{ marginRight: 6, color: GOLD }} />VISITORS COUNT - ALL TIME HISTORY</div><div style={{ fontSize: 11, color: '#888' }}>Total: {filteredHistory.length} / {allVisitorsHistory.length} • Now Members: {filteredHistory.filter(v => v.isConverted).length} • Not yet: {filteredHistory.filter(v => !v.isConverted).length}</div></div>
+                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                    <div style={{ background: NAVY, color: GOLD, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Total Ever: {allVisitorsHistory.length}</div>
+                    <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 8, border: `1.5px solid ${GOLD}`, fontSize: 12, fontWeight: 700, background: WHITE, color: NAVY }}>
+                      {monthsList.map(m => <option key={m} value={m}>{m === "All" ? "All Months ▼" : m}</option>)}
+                    </select>
+                    <button onClick={() => setShowHistory(false)} style={{ background: '#fee2e2', color: '#dc2626', border: 'none', padding: '6px 10px', borderRadius: 6, cursor: 'pointer', fontWeight: 700 }}><FaTimes /> Close</button>
+                  </div>
+                </div>
+                <div style={{ overflow: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}><div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>MONTH JOINED <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ padding: '2px 4px', borderRadius: 4, border: `1px solid ${GOLD}`, fontSize: 10, fontWeight: 700, background: NAVY, color: GOLD }}><option value="All">▼ All</option>{monthsList.filter(m => m !== "All").map(m => <option key={m} value={m}>{m}</option>)}</select></div></th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}>STATUS</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: GOLD }}>GROUP</th></tr></thead>
+                    <tbody>{filteredHistory.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors for {monthFilter}</td></tr> : filteredHistory.slice().reverse().map(v => (
+                      <tr key={v.id} style={{ borderTop: '1px solid #eee', background: v.isConverted ? '#f0fdf4' : 'white' }}>
+                        <td style={{ padding: 10, fontWeight: 600, fontSize: 12 }}>{v.fullName}</td>
+                        <td style={{ padding: 10, fontSize: 12, fontWeight: 700, color: NAVY }}>{v.monthJoined || getMonthName(v.visitDate)}</td>
+                        <td style={{ padding: 10, fontSize: 11 }}>{v.visitDate}</td>
+                        <td style={{ padding: 10, fontSize: 11 }}>{v.phoneNumber}</td>
+                        <td style={{ padding: 10 }}><span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: v.isConverted ? '#dcfce7' : '#fef3c7', color: v.isConverted ? '#16a34a' : '#d97706' }}>{v.isConverted ? 'Member now' : 'Not yet member'}</span></td>
+                        <td style={{ padding: 10, fontSize: 11 }}>{v.isConverted ? <b style={{ color: NAVY }}>{v.convertedGroup} • {v.convertedDate}</b> : '-'}</td>
+                      </tr>
+                    ))}</tbody></table>
                 </div>
               </div>
-              <div style={{ overflow: 'auto' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: '#F8F6F1', borderBottom: `2px solid ${GOLD}` }}><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>NAME</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>MONTH JOINED</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>PHONE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>STATUS</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>GROUP</th></tr></thead>
-                  <tbody>{allVisitorsHistory.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors history yet</td></tr> : allVisitorsHistory.slice().reverse().map(v => (
-                    <tr key={v.id} style={{ borderTop: '1px solid #eee', background: v.isConverted ? '#f0fdf4' : 'white' }}>
-                      <td style={{ padding: 10, fontWeight: 600, fontSize: 12 }}>{v.fullName}</td>
-                      <td style={{ padding: 10, fontSize: 12, fontWeight: 700, color: NAVY }}>{v.monthJoined || getMonthName(v.visitDate)}</td>
-                      <td style={{ padding: 10, fontSize: 11 }}>{v.visitDate}</td>
-                      <td style={{ padding: 10, fontSize: 11 }}>{v.phoneNumber}</td>
-                      <td style={{ padding: 10 }}><span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: v.isConverted ? '#dcfce7' : '#fef3c7', color: v.isConverted ? '#16a34a' : '#d97706' }}>{v.isConverted ? 'Member now' : 'Not yet member'}</span></td>
-                      <td style={{ padding: 10, fontSize: 11 }}>{v.isConverted ? <b style={{ color: NAVY }}>{v.convertedGroup} • {v.convertedDate}</b> : '-'}</td>
-                    </tr>
-                  ))}</tbody></table>
-              </div>
-            </div>
+            )}
           </div>
         )}
 
@@ -282,6 +301,38 @@ export default function App() {
         )}
       </div>
 
+      {showHistoryPage && (
+        <div style={{ position: 'fixed', inset: 0, background: '#F8F6F1', zIndex: 200, overflowY: 'auto', padding: 30 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+            <div><div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>PATAMA CMS</div><h1 style={{ margin: 0, color: NAVY, display: 'flex', gap: 10, alignItems: 'center' }}><FaHistory style={{ color: GOLD }} /> Visitors All Time History - New Page</h1><div style={{ fontSize: 12, color: '#888' }}>Filtered: {filteredHistory.length} / Total Ever: {allVisitorsHistory.length} • Month: {monthFilter}</div></div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+              <select value={monthFilter} onChange={e => setMonthFilter(e.target.value)} style={{ padding: '10px 12px', borderRadius: 8, border: `1.5px solid ${GOLD}`, fontSize: 13, fontWeight: 700, background: WHITE, color: NAVY }}>
+                {monthsList.map(m => <option key={m} value={m}>{m === "All" ? "All Months" : m}</option>)}
+              </select>
+              <button onClick={() => setShowHistoryPage(false)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', fontWeight: 700 }}>✕ Back to Visitors</button>
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12, marginBottom: 20 }}>
+            <div style={{ background: NAVY, color: WHITE, padding: 16, borderRadius: 12 }}><div style={{ fontSize: 11, color: GOLD }}>TOTAL EVER</div><div style={{ fontSize: 28, fontWeight: 800 }}>{filteredHistory.length}</div><div style={{ fontSize: 10, color: GOLD }}>{monthFilter !== "All" ? monthFilter : "All months"}</div></div>
+            <div style={{ background: WHITE, padding: 16, borderRadius: 12, borderLeft: `4px solid #16a34a` }}><div style={{ fontSize: 11, color: '#888' }}>MEMBER NOW</div><div style={{ fontSize: 28, fontWeight: 800, color: '#16a34a' }}>{filteredHistory.filter(v => v.isConverted).length}</div></div>
+            <div style={{ background: WHITE, padding: 16, borderRadius: 12, borderLeft: `4px solid #d97706` }}><div style={{ fontSize: 11, color: '#888' }}>NOT YET MEMBER</div><div style={{ fontSize: 28, fontWeight: 800, color: '#d97706' }}>{filteredHistory.filter(v => !v.isConverted).length}</div></div>
+          </div>
+          <div style={{ background: WHITE, borderRadius: 12, padding: 16 }}>
+            <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>MONTH JOINED ▼ {monthFilter}</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>STATUS</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>GROUP / CONVERTED</th></tr></thead>
+              <tbody>{filteredHistory.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors for {monthFilter}</td></tr> : filteredHistory.slice().reverse().map(v => (
+                <tr key={v.id} style={{ borderTop: '1px solid #eee', background: v.isConverted ? '#f0fdf4' : 'white' }}>
+                  <td style={{ padding: 12, fontWeight: 600 }}>{v.fullName}</td>
+                  <td style={{ padding: 12, fontWeight: 700, color: NAVY }}>{v.monthJoined || getMonthName(v.visitDate)}</td>
+                  <td style={{ padding: 12 }}>{v.visitDate}</td>
+                  <td style={{ padding: 12 }}>{v.phoneNumber}</td>
+                  <td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.isConverted ? '#dcfce7' : '#fef3c7', color: v.isConverted ? '#16a34a' : '#d97706' }}>{v.isConverted ? 'Member now' : 'Not yet member'}</span></td>
+                  <td style={{ padding: 12 }}>{v.isConverted ? <b>{v.convertedGroup} • {v.convertedDate}</b> : '-'}</td>
+                </tr>
+              ))}</tbody></table>
+          </div>
+        </div>
+      )}
+
       {showAdd && (<div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 }}><div style={{ background: WHITE, padding: 24, borderRadius: 16, width: 400, borderTop: `4px solid ${GOLD}` }}><div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}><h3 style={{ margin: 0, color: NAVY }}>Add Member</h3><button onClick={() => setShowAdd(false)} style={{ border: 'none', background: '#eee', borderRadius: 6, padding: 6 }}><FaTimes /></button></div><input placeholder="Full Name" value={newMember.name} onChange={e => setNewMember({ ...newMember, name: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #ccc' }} /><input placeholder="Phone" value={newMember.phone} onChange={e => setNewMember({ ...newMember, phone: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 10, borderRadius: 8, border: '1px solid #ccc' }} /><select value={newMember.group} onChange={e => setNewMember({ ...newMember, group: e.target.value })} style={{ width: '100%', padding: 10, marginBottom: 16, borderRadius: 8, border: '1px solid #ccc' }}><option>Choir</option><option>Youth</option><option>Women</option><option>Men</option><option>Children</option></select><button onClick={addMember} style={{ width: '100%', background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: 12, borderRadius: 8, fontWeight: 700 }}>Add</button></div></div>)}
 
       {showVisitorModal && selectedVisitor && (
@@ -312,13 +363,11 @@ export default function App() {
                   </div>
                   <button onClick={() => setShowVisitorModal(false)} style={{ background: WHITE, color: NAVY, border: 'none', padding: '6px 12px', borderRadius: 8, height: 32, fontSize: 12, fontWeight: 700 }}>✕ CLOSE</button>
                 </div>
-
                 <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid #eee', padding: '0 20px' }}>
                   <button onClick={() => setVisitorTabInner("overview")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "overview" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Overview</button>
                   <button onClick={() => setVisitorTabInner("history")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "history" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Visit History ({selectedVisitor.visits?.length || 1})</button>
                   <button onClick={() => setVisitorTabInner("notes")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "notes" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Follow-up Notes</button>
                 </div>
-
                 <div style={{ padding: 20, overflowY: 'auto', flex: 1, background: WHITE }}>
                   {visitorTabInner === "overview" && (
                     <>
@@ -333,27 +382,21 @@ export default function App() {
                         <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Single</option><option>Married</option></select></div>
                         <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>WANTS TO JOIN? *</label><select value={selectedVisitor.wantsToJoin} onChange={e => setSelectedVisitor({ ...selectedVisitor, wantsToJoin: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: `2px solid ${GOLD}`, marginTop: 4, fontSize: 13, fontWeight: 600 }}><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option></select></div>
                       </div>
-
                       <div style={{ marginTop: 18, border: `1px solid ${GOLD}30`, borderRadius: 12, padding: 14, background: '#f9fafb' }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, marginBottom: 8 }}>CONVERT TO MEMBER</div>
-                        <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>{selectedVisitor.wantsToJoin === "Yes" ? "Select group then convert - will be deleted from Visitors list but remain in count below" : "Enable only when Wants to Join = Yes"}</div>
                         <select value={convertGroup} onChange={e => setConvertGroup(e.target.value)} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}`, marginBottom: 10, background: WHITE, fontWeight: 600 }}>
                           <option>Choir</option><option>Youth</option><option>Women</option><option>Men</option><option>Children</option>
                         </select>
                         <button onClick={convertToMember} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 12, borderRadius: 8, background: selectedVisitor.wantsToJoin === "Yes" ? NAVY : '#e5e7eb', color: selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#9ca3af', border: `1px solid ${selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#ddd'}`, fontWeight: 700, cursor: selectedVisitor.wantsToJoin === "Yes" ? 'pointer' : 'not-allowed' }}>⛪ CONVERT TO {convertGroup.toUpperCase()}</button>
                       </div>
-
                       <div style={{ display: 'flex', gap: 10, marginTop: 16 }}><button onClick={() => setShowVisitorModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: `1px solid ${GOLD}40`, background: WHITE, color: NAVY }}>Cancel</button><button onClick={saveVisitor} style={{ flex: 1, padding: 12, borderRadius: 8, background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, fontWeight: 700 }}>SAVE VISITOR</button></div>
                     </>
                   )}
-
                   {visitorTabInner === "history" && (
                     <div>
                       <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 10, color: NAVY }}>PREVIOUS VISITS</div>
                       <div style={{ borderLeft: `3px solid ${GOLD}`, paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                        {selectedVisitor.visits?.map((vi, i) => (
-                          <div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service}</div>
-                        ))}
+                        {selectedVisitor.visits?.map((vi, i) => (<div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service}</div>))}
                       </div>
                       <div style={{ background: NAVY, padding: 12, borderRadius: 10, marginTop: 14 }}>
                         <select value={newVisitForm.service} onChange={e => setNewVisitForm({ ...newVisitForm, service: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6 }}><option>Sunday Service</option><option>Midweek</option><option>Friday Kesha</option></select>
@@ -362,10 +405,7 @@ export default function App() {
                       </div>
                     </div>
                   )}
-
-                  {visitorTabInner === "notes" && (
-                    <div><textarea value={selectedVisitor.notes} onChange={e => setSelectedVisitor({ ...selectedVisitor, notes: e.target.value })} style={{ width: '100%', height: 180, padding: 12, borderRadius: 8, border: '1px solid #ccc' }} placeholder="Follow-up notes..."></textarea><button onClick={saveVisitor} style={{ marginTop: 10, width: '100%', padding: 12, background: NAVY, color: GOLD, borderRadius: 8, fontWeight: 700 }}>Save Notes</button></div>
-                  )}
+                  {visitorTabInner === "notes" && (<div><textarea value={selectedVisitor.notes} onChange={e => setSelectedVisitor({ ...selectedVisitor, notes: e.target.value })} style={{ width: '100%', height: 180, padding: 12, borderRadius: 8, border: '1px solid #ccc' }} placeholder="Follow-up notes..."></textarea><button onClick={saveVisitor} style={{ marginTop: 10, width: '100%', padding: 12, background: NAVY, color: GOLD, borderRadius: 8, fontWeight: 700 }}>Save Notes</button></div>)}
                 </div>
               </>
             )}
