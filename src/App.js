@@ -205,7 +205,7 @@ export default function App() {
 
             <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto', marginBottom: 16 }}>
               <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: 12, color: NAVY, background: '#F8F6F1', borderBottom: '1px solid #eee', display: 'flex', justifyContent: 'space-between' }}>
-                <span>ACTIVE VISITORS LIST - {filteredVisitors.length} visitors (converted are deleted from here)</span>
+                <span>ACTIVE VISITORS LIST - {filteredVisitors.length} visitors (The Church)</span>
                 <span style={{ color: GOLD, cursor: 'pointer' }} onClick={() => setShowHistory(!showHistory)}><FaHistory /> {showHistory ? "Hide All Time History" : "Show All Time History"} ({allVisitorsHistory.length})</span>
               </div>
               <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>RESIDENCE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>WANTS TO JOIN?</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>ACTION</th></tr></thead>
