@@ -30,6 +30,8 @@ export default function App() {
   const [visitorSearch, setVisitorSearch] = useState("");
   const [visitorTabInner, setVisitorTabInner] = useState("overview");
   const [newVisitForm, setNewVisitForm] = useState({ service: "Sunday Service", notes: "" });
+  const [isNewVisitorMode, setIsNewVisitorMode] = useState(false);
+  const [convertGroup, setConvertGroup] = useState("Choir");
 
   const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
   const [search, setSearch] = useState("");
@@ -74,9 +76,10 @@ export default function App() {
   const openNewVisitor = () => {
     const sysdate = new Date().toISOString().split('T')[0];
     setSelectedVisitor({
-      id: Date.now(), visitDate: sysdate, fullName: "", phoneNumber: "", email: "", maritalStatus: "", bornAgain: "", residence: "", source: "", wantsToJoin: "", status: "New", notes: "", ministry: "",
+      id: Date.now(), visitDate: sysdate, fullName: "", phoneNumber: "", email: "", maritalStatus: "", bornAgain: "Yes", residence: "", source: "", wantsToJoin: "", status: "New", notes: "", ministry: "",
       visits: [{ date: sysdate, service: "Sunday Service", notes: "First visit" }]
     });
+    setIsNewVisitorMode(true);
     setVisitorTabInner("overview");
     setShowVisitorModal(true);
   };
@@ -84,6 +87,8 @@ export default function App() {
   const openEditVisitor = (v) => {
     if (!v.visits) { v.visits = [{ date: v.visitDate || new Date().toISOString().split('T')[0], service: "Sunday Service", notes: "First visit" }]; }
     setSelectedVisitor(v);
+    setIsNewVisitorMode(false);
+    setConvertGroup("Choir");
     setVisitorTabInner("overview");
     setShowVisitorModal(true);
   };
@@ -96,7 +101,6 @@ export default function App() {
     setNewVisitForm({ service: "Sunday Service", notes: "" });
   };
 
-  // FIXED POINT 5: No auto-convert - only save as Visitor with Yes marked
   const saveVisitor = () => {
     if (!selectedVisitor.fullName) return alert("Full name required");
     const exists = visitors.find(v => v.id === selectedVisitor.id);
@@ -105,19 +109,18 @@ export default function App() {
     setShowVisitorModal(false);
   };
 
-  // FIXED POINT 6: Convert to Member button - only enabled when Wants to Join = Yes
   const convertToMember = () => {
     if (selectedVisitor.wantsToJoin !== "Yes") return alert("Set Wants to Join to Yes first");
-    if (!window.confirm(`Convert ${selectedVisitor.fullName} to Member?`)) return;
+    if (!window.confirm(`Convert ${selectedVisitor.fullName} to ${convertGroup}?`)) return;
     const newMemberFromVisitor = {
       id: Date.now(), name: selectedVisitor.fullName, role: "Member", phone: selectedVisitor.phoneNumber,
-      group: "Choir", status: "Active", email: selectedVisitor.email,
+      group: convertGroup, status: "Active", email: selectedVisitor.email,
       dateJoined: new Date().toISOString().split('T')[0], photo: null, emergency: { name: "", relation: "", phone: "" }, family: [], fromVisitor: true, residence: selectedVisitor.residence
     };
     setMembers([...members, newMemberFromVisitor]);
     setVisitors(visitors.filter(v => v.id !== selectedVisitor.id));
     setShowVisitorModal(false);
-    alert(selectedVisitor.fullName + " converted to Member!");
+    alert(selectedVisitor.fullName + " converted to " + convertGroup + " Member!");
   };
 
   const filteredVisitors = visitors.filter(v => {
@@ -156,10 +159,7 @@ export default function App() {
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}><div><div style={{ fontSize: 12, color: GOLD, fontWeight: 700 }}>PATAMA CMS</div><h1 style={{ margin: 0, color: NAVY }}>{tab === "members" ? "Members" : tab === "visitors" ? "Visitors" : tab === "attendance" ? "Attendance Sheet" : tab === "reports" ? "Reports" : "Offering & Tithe"}</h1></div>
           <div style={{ display: 'flex', gap: 10 }}>
             {tab === "visitors" ? <button onClick={openNewVisitor} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add Visitor</button> :
-              <>
-                <button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button>
-                <button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button>
-              </>}
+              <><button onClick={exportToCSV} style={{ background: WHITE, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center', color: NAVY }}><FaDownload /> Export</button><button onClick={() => setShowAdd(true)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '10px 16px', borderRadius: 8, cursor: 'pointer', display: 'flex', gap: 6, alignItems: 'center' }}><FaPlus /> Add member</button></>}
           </div></div>
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 16, marginBottom: 20 }}>
@@ -247,67 +247,91 @@ export default function App() {
 
       {showVisitorModal && selectedVisitor && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 10 }}>
-          <div style={{ background: WHITE, borderRadius: 16, width: '100%', maxWidth: 520, maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: `4px solid ${GOLD}` }}>
-            <div style={{ background: NAVY, color: WHITE, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
-                <div style={{ width: 40, height: 40, background: GOLD, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: NAVY }}>{selectedVisitor.fullName?.charAt(0) || "V"}</div>
-                <div><div style={{ fontWeight: 700, fontSize: 16 }}>{visitors.find(v => v.id === selectedVisitor.id) ? "Edit Visitor" : "Add New Visitor"}</div><div style={{ fontSize: 11, color: GOLD }}>Patama CMS • Visitor</div></div>
-              </div>
-              <button onClick={() => setShowVisitorModal(false)} style={{ background: WHITE, color: NAVY, border: 'none', padding: '6px 12px', borderRadius: 8, height: 32, fontSize: 12, fontWeight: 700 }}>✕ CLOSE</button>
-            </div>
+          <div style={{ background: WHITE, borderRadius: 16, width: '100%', maxWidth: isNewVisitorMode ? 380 : 560, maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: `4px solid ${GOLD}` }}>
 
-            <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid #eee', padding: '0 20px' }}>
-              <button onClick={() => setVisitorTabInner("overview")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "overview" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Overview</button>
-              <button onClick={() => setVisitorTabInner("history")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "history" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Visit History ({selectedVisitor.visits?.length || 1})</button>
-              <button onClick={() => setVisitorTabInner("notes")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "notes" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Follow-up Notes</button>
-            </div>
-
-            <div style={{ padding: 20, overflowY: 'auto', flex: 1, background: WHITE }}>
-              {visitorTabInner === "overview" && (
-                <>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>VISIT DATE *</label><input type="date" value={selectedVisitor.visitDate} max={new Date().toISOString().split('T')[0]} onChange={e => setSelectedVisitor({ ...selectedVisitor, visitDate: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}60`, marginTop: 4, fontSize: 13, background: '#fffbeb' }} /></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>FULL NAME *</label><input value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>PHONE</label><input value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>EMAIL</label><input value={selectedVisitor.email} onChange={e => setSelectedVisitor({ ...selectedVisitor, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Single</option><option>Married</option></select></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>BORN AGAIN?</label><select value={selectedVisitor.bornAgain} onChange={e => setSelectedVisitor({ ...selectedVisitor, bornAgain: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Yes</option><option>No</option></select></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>RESIDENCE</label><input value={selectedVisitor.residence} onChange={e => setSelectedVisitor({ ...selectedVisitor, residence: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                    <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>SOURCE</label><input value={selectedVisitor.source} onChange={e => setSelectedVisitor({ ...selectedVisitor, source: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                    <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>WANTS TO JOIN? *</label><select value={selectedVisitor.wantsToJoin} onChange={e => setSelectedVisitor({ ...selectedVisitor, wantsToJoin: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: `2px solid ${GOLD}`, marginTop: 4, fontSize: 13, fontWeight: 600 }}><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option></select></div>
-                  </div>
-
-                  {/* REPLACED MINISTRIES BOX WITH CONVERT BUTTON */}
-                  <div style={{ marginTop: 18, border: `1px solid ${GOLD}30`, borderRadius: 12, padding: 14, background: selectedVisitor.wantsToJoin === "Yes" ? '#dcfce7' : '#f9fafb' }}>
-                    <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, marginBottom: 8 }}>CONVERT TO MEMBER</div>
-                    <div style={{ fontSize: 11, color: '#666', marginBottom: 10 }}>{selectedVisitor.wantsToJoin === "Yes" ? "Visitor wants to join - you can convert to Member" : "Button will be enabled only when Wants to Join = Yes"}</div>
-                    <button onClick={convertToMember} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 12, borderRadius: 8, background: selectedVisitor.wantsToJoin === "Yes" ? NAVY : '#e5e7eb', color: selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#9ca3af', border: `1px solid ${selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#ddd'}`, fontWeight: 700, cursor: selectedVisitor.wantsToJoin === "Yes" ? 'pointer' : 'not-allowed', opacity: selectedVisitor.wantsToJoin === "Yes" ? 1 : 0.6 }}>⛪ CONVERT TO MEMBER</button>
-                  </div>
-
-                  <div style={{ display: 'flex', gap: 10, marginTop: 16 }}><button onClick={() => setShowVisitorModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: `1px solid ${GOLD}40`, background: WHITE, color: NAVY }}>Cancel</button><button onClick={saveVisitor} style={{ flex: 1, padding: 12, borderRadius: 8, background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, fontWeight: 700 }}>SAVE VISITOR</button></div>
-                </>
-              )}
-
-              {visitorTabInner === "history" && (
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 10, color: NAVY }}>PREVIOUS VISITS</div>
-                  <div style={{ borderLeft: `3px solid ${GOLD}`, paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {selectedVisitor.visits?.map((vi, i) => (
-                      <div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service} {vi.notes && <div style={{ color: '#666' }}>{vi.notes}</div>}</div>
-                    ))}
-                  </div>
-                  <div style={{ background: NAVY, padding: 12, borderRadius: 10, marginTop: 14 }}>
-                    <select value={newVisitForm.service} onChange={e => setNewVisitForm({ ...newVisitForm, service: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6 }}><option>Sunday Service</option><option>Midweek</option><option>Friday Kesha</option></select>
-                    <input placeholder="Notes" value={newVisitForm.notes} onChange={e => setNewVisitForm({ ...newVisitForm, notes: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6, marginTop: 6 }} />
-                    <button onClick={handleAddVisit} style={{ width: '100%', marginTop: 8, background: GOLD, color: NAVY, padding: 10, borderRadius: 6, fontWeight: 700 }}>+ Add Visit</button>
-                  </div>
+            {isNewVisitorMode ? (
+              <>
+                <div style={{ padding: 20, paddingBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Add Member</h3>
+                  <button onClick={() => setShowVisitorModal(false)} style={{ border: 'none', background: '#f3f4f6', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 700 }}>✕</button>
                 </div>
-              )}
+                <div style={{ padding: 20, paddingTop: 10, background: WHITE }}>
+                  <input placeholder="Full Name" value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }} />
+                  <input placeholder="Phone" value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 12, marginBottom: 12, borderRadius: 8, border: '1px solid #ddd', fontSize: 14 }} />
+                  <select value={selectedVisitor.bornAgain} onChange={e => setSelectedVisitor({ ...selectedVisitor, bornAgain: e.target.value })} style={{ width: '100%', padding: 12, marginBottom: 16, borderRadius: 8, border: '1px solid #111', fontSize: 14, background: WHITE }}>
+                    <option value="Yes">Yes - Born Again</option>
+                    <option value="No">No - Not Born Again</option>
+                  </select>
+                  <button onClick={saveVisitor} style={{ width: '100%', background: NAVY, color: WHITE, border: 'none', padding: 14, borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Add</button>
+                  <div style={{ fontSize: 11, color: '#888', marginTop: 10, textAlign: 'center' }}>Visit Date: {selectedVisitor.visitDate} (can edit after adding in View)</div>
+                </div>
+              </>
+            ) : (
+              <>
+                <div style={{ background: NAVY, color: WHITE, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                    <div style={{ width: 40, height: 40, background: GOLD, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: NAVY }}>{selectedVisitor.fullName?.charAt(0) || "V"}</div>
+                    <div><div style={{ fontWeight: 700, fontSize: 16 }}>Edit Visitor</div><div style={{ fontSize: 11, color: GOLD }}>Patama CMS • Visitor</div></div>
+                  </div>
+                  <button onClick={() => setShowVisitorModal(false)} style={{ background: WHITE, color: NAVY, border: 'none', padding: '6px 12px', borderRadius: 8, height: 32, fontSize: 12, fontWeight: 700 }}>✕ CLOSE</button>
+                </div>
 
-              {visitorTabInner === "notes" && (
-                <div><textarea value={selectedVisitor.notes} onChange={e => setSelectedVisitor({ ...selectedVisitor, notes: e.target.value })} style={{ width: '100%', height: 180, padding: 12, borderRadius: 8, border: '1px solid #ccc' }} placeholder="Follow-up notes..."></textarea><button onClick={saveVisitor} style={{ marginTop: 10, width: '100%', padding: 12, background: NAVY, color: GOLD, borderRadius: 8, fontWeight: 700 }}>Save Notes</button></div>
-              )}
-            </div>
+                <div style={{ display: 'flex', gap: 20, borderBottom: '1px solid #eee', padding: '0 20px' }}>
+                  <button onClick={() => setVisitorTabInner("overview")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "overview" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Overview</button>
+                  <button onClick={() => setVisitorTabInner("history")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "history" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Visit History ({selectedVisitor.visits?.length || 1})</button>
+                  <button onClick={() => setVisitorTabInner("notes")} style={{ padding: '12px 0', border: 'none', background: 'none', borderBottom: visitorTabInner === "notes" ? `2px solid ${GOLD}` : '2px solid transparent', fontWeight: 700, fontSize: 13, color: NAVY }}>Follow-up Notes</button>
+                </div>
+
+                <div style={{ padding: 20, overflowY: 'auto', flex: 1, background: WHITE }}>
+                  {visitorTabInner === "overview" && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>VISIT DATE *</label><input type="date" value={selectedVisitor.visitDate} max={new Date().toISOString().split('T')[0]} onChange={e => setSelectedVisitor({ ...selectedVisitor, visitDate: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}60`, marginTop: 4, fontSize: 13, background: '#fffbeb' }} /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>FULL NAME *</label><input value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>PHONE</label><input value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>EMAIL</label><input value={selectedVisitor.email} onChange={e => setSelectedVisitor({ ...selectedVisitor, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>BORN AGAIN?</label><select value={selectedVisitor.bornAgain} onChange={e => setSelectedVisitor({ ...selectedVisitor, bornAgain: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Yes</option><option>No</option></select></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>RESIDENCE</label><input value={selectedVisitor.residence} onChange={e => setSelectedVisitor({ ...selectedVisitor, residence: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>SOURCE</label><input value={selectedVisitor.source} onChange={e => setSelectedVisitor({ ...selectedVisitor, source: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>WANTS TO JOIN? *</label><select value={selectedVisitor.wantsToJoin} onChange={e => setSelectedVisitor({ ...selectedVisitor, wantsToJoin: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: `2px solid ${GOLD}`, marginTop: 4, fontSize: 13, fontWeight: 600 }}><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option></select></div>
+                      </div>
+
+                      <div style={{ marginTop: 18, border: `1px solid ${GOLD}30`, borderRadius: 12, padding: 14, background: selectedVisitor.wantsToJoin === "Yes" ? '#dcfce7' : '#f9fafb' }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, marginBottom: 8 }}>CONVERT TO MEMBER</div>
+                        <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>{selectedVisitor.wantsToJoin === "Yes" ? "Select group then convert" : "Enable only when Wants to Join = Yes"}</div>
+                        <select value={convertGroup} onChange={e => setConvertGroup(e.target.value)} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}`, marginBottom: 10, background: WHITE, fontWeight: 600 }}>
+                          <option>Choir</option><option>Youth</option><option>Women</option><option>Men</option><option>Children</option>
+                        </select>
+                        <button onClick={convertToMember} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 12, borderRadius: 8, background: selectedVisitor.wantsToJoin === "Yes" ? NAVY : '#e5e7eb', color: selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#9ca3af', border: `1px solid ${selectedVisitor.wantsToJoin === "Yes" ? GOLD : '#ddd'}`, fontWeight: 700, cursor: selectedVisitor.wantsToJoin === "Yes" ? 'pointer' : 'not-allowed' }}>⛪ CONVERT TO {convertGroup.toUpperCase()}</button>
+                      </div>
+
+                      <div style={{ display: 'flex', gap: 10, marginTop: 16 }}><button onClick={() => setShowVisitorModal(false)} style={{ flex: 1, padding: 12, borderRadius: 8, border: `1px solid ${GOLD}40`, background: WHITE, color: NAVY }}>Cancel</button><button onClick={saveVisitor} style={{ flex: 1, padding: 12, borderRadius: 8, background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, fontWeight: 700 }}>SAVE VISITOR</button></div>
+                    </>
+                  )}
+
+                  {visitorTabInner === "history" && (
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 10, color: NAVY }}>PREVIOUS VISITS</div>
+                      <div style={{ borderLeft: `3px solid ${GOLD}`, paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                        {selectedVisitor.visits?.map((vi, i) => (
+                          <div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service} {vi.notes && <div style={{ color: '#666' }}>{vi.notes}</div>}</div>
+                        ))}
+                      </div>
+                      <div style={{ background: NAVY, padding: 12, borderRadius: 10, marginTop: 14 }}>
+                        <select value={newVisitForm.service} onChange={e => setNewVisitForm({ ...newVisitForm, service: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6 }}><option>Sunday Service</option><option>Midweek</option><option>Friday Kesha</option><option>Youth Service</option><option>Special Event</option><option>Cell Meeting</option></select>
+                        <input placeholder="Notes" value={newVisitForm.notes} onChange={e => setNewVisitForm({ ...newVisitForm, notes: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6, marginTop: 6 }} />
+                        <button onClick={handleAddVisit} style={{ width: '100%', marginTop: 8, background: GOLD, color: NAVY, padding: 10, borderRadius: 6, fontWeight: 700 }}>+ Add Visit</button>
+                      </div>
+                    </div>
+                  )}
+
+                  {visitorTabInner === "notes" && (
+                    <div><textarea value={selectedVisitor.notes} onChange={e => setSelectedVisitor({ ...selectedVisitor, notes: e.target.value })} style={{ width: '100%', height: 180, padding: 12, borderRadius: 8, border: '1px solid #ccc' }} placeholder="Follow-up notes..."></textarea><button onClick={saveVisitor} style={{ marginTop: 10, width: '100%', padding: 12, background: NAVY, color: GOLD, borderRadius: 8, fontWeight: 700 }}>Save Notes</button></div>
+                  )}
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
