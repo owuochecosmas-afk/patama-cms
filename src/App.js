@@ -24,6 +24,7 @@ export default function App() {
   const [offerings, setOfferings] = useState(() => { const s = localStorage.getItem('patama_offerings'); return s ? JSON.parse(s) : [{ id: 1, date: '2026-08-21', type: 'Offering', amount: 8500, member: 'Sunday Service', method: 'Cash' }, { id: 2, date: '2026-08-21', type: 'Tithe', amount: 3200, member: 'John Mwangi', method: 'M-Pesa' }]; });
 
   const [visitors, setVisitors] = useState(() => { const s = localStorage.getItem('patama_visitors'); return s ? JSON.parse(s) : []; });
+  const [allVisitorsHistory, setAllVisitorsHistory] = useState(() => { const s = localStorage.getItem('patama_all_visitors_history'); return s ? JSON.parse(s) : []; });
   const [selectedVisitor, setSelectedVisitor] = useState(null);
   const [showVisitorModal, setShowVisitorModal] = useState(false);
   const [visitorFilter, setVisitorFilter] = useState("");
@@ -48,6 +49,7 @@ export default function App() {
   useEffect(() => { localStorage.setItem('patama_attendance', JSON.stringify(attendance)); }, [attendance]);
   useEffect(() => { localStorage.setItem('patama_offerings', JSON.stringify(offerings)); }, [offerings]);
   useEffect(() => { localStorage.setItem('patama_visitors', JSON.stringify(visitors)); }, [visitors]);
+  useEffect(() => { localStorage.setItem('patama_all_visitors_history', JSON.stringify(allVisitorsHistory)); }, [allVisitorsHistory]);
 
   const dayRecord = attendance[selectedDate] || {};
   const getTodayStatus = (id) => dayRecord[id] || "Absent";
@@ -73,10 +75,12 @@ export default function App() {
   const statusColor = (s) => s === "Present" ? "#dcfce7" : s === "Late" ? "#fef3c7" : s === "Active" ? "#dcfce7" : "#fee2e2";
   const statusTextColor = (s) => s === "Present" ? "#16a34a" : s === "Late" ? "#d97706" : s === "Active" ? "#16a34a" : "#dc2626";
 
+  const getMonthName = (dateStr) => { if (!dateStr) return "-"; const d = new Date(dateStr); return d.toLocaleString('default', { month: 'short', year: 'numeric' }); };
+
   const openNewVisitor = () => {
     const sysdate = new Date().toISOString().split('T')[0];
     setSelectedVisitor({
-      id: Date.now(), visitDate: sysdate, fullName: "", phoneNumber: "", email: "", maritalStatus: "", bornAgain: "Yes", residence: "", source: "", wantsToJoin: "", status: "New", notes: "", ministry: "",
+      id: Date.now(), visitDate: sysdate, fullName: "", phoneNumber: "", email: "", maritalStatus: "", bornAgain: "Yes", residence: "", source: "", wantsToJoin: "", status: "New", notes: "", ministry: "", isConverted: false,
       visits: [{ date: sysdate, service: "Sunday Service", notes: "First visit" }]
     });
     setIsNewVisitorMode(true);
@@ -104,8 +108,13 @@ export default function App() {
   const saveVisitor = () => {
     if (!selectedVisitor.fullName) return alert("Full name required");
     const exists = visitors.find(v => v.id === selectedVisitor.id);
-    if (exists) { setVisitors(visitors.map(v => v.id === selectedVisitor.id ? selectedVisitor : v)); }
-    else { setVisitors([...visitors, selectedVisitor]); }
+    if (exists) {
+      setVisitors(visitors.map(v => v.id === selectedVisitor.id ? selectedVisitor : v));
+      setAllVisitorsHistory(allVisitorsHistory.map(v => v.id === selectedVisitor.id ? { ...selectedVisitor, monthJoined: getMonthName(selectedVisitor.visitDate) } : v));
+    } else {
+      setVisitors([...visitors, selectedVisitor]);
+      setAllVisitorsHistory([...allVisitorsHistory, { ...selectedVisitor, monthJoined: getMonthName(selectedVisitor.visitDate), isConverted: false, convertedDate: null, convertedGroup: "" }]);
+    }
     setShowVisitorModal(false);
   };
 
@@ -118,9 +127,11 @@ export default function App() {
       dateJoined: new Date().toISOString().split('T')[0], photo: null, emergency: { name: "", relation: "", phone: "" }, family: [], fromVisitor: true, residence: selectedVisitor.residence
     };
     setMembers([...members, newMemberFromVisitor]);
+    // DELETE from visitors list but KEEP in history as Member now
     setVisitors(visitors.filter(v => v.id !== selectedVisitor.id));
+    setAllVisitorsHistory(allVisitorsHistory.map(v => v.id === selectedVisitor.id ? { ...v, isConverted: true, convertedDate: new Date().toISOString().split('T')[0], convertedGroup: convertGroup, status: "Member now", wantsToJoin: v.wantsToJoin } : v));
     setShowVisitorModal(false);
-    alert(selectedVisitor.fullName + " converted to " + convertGroup + " Member!");
+    alert(selectedVisitor.fullName + " converted to " + convertGroup + " and removed from Visitors list but still in Visitors Count history.");
   };
 
   const filteredVisitors = visitors.filter(v => {
@@ -147,7 +158,7 @@ export default function App() {
       <div style={{ width: 260, background: NAVY, color: WHITE, padding: 20, borderRadius: 16, margin: 10, height: 'fit-content', position: 'sticky', top: 10 }}>
         <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 30 }}><div style={{ width: 40, height: 40, background: GOLD, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: NAVY }}>P</div><div><div style={{ fontWeight: 700, fontSize: 18 }}>Patama</div><div style={{ fontSize: 12, color: GOLD }}>CMS</div></div></div>
         <div onClick={() => setTab("members")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "members" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "members" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "members" ? GOLD : WHITE }}><FaUsers /> Members</div>
-        <div onClick={() => setTab("visitors")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "visitors" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "visitors" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "visitors" ? GOLD : WHITE }}><FaUserPlus /> Visitors {visitors.length > 0 && <span style={{ background: GOLD, color: NAVY, fontSize: 10, padding: '2px 6px', borderRadius: 10, marginLeft: 'auto' }}>{visitors.length}</span>}</div>
+        <div onClick={() => setTab("visitors")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "visitors" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "visitors" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "visitors" ? GOLD : WHITE }}><FaUserPlus /> Visitors {allVisitorsHistory.length > 0 && <span style={{ background: GOLD, color: NAVY, fontSize: 10, padding: '2px 6px', borderRadius: 10, marginLeft: 'auto' }}>{allVisitorsHistory.length}</span>}</div>
         <div onClick={() => setTab("attendance")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "attendance" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "attendance" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "attendance" ? GOLD : WHITE }}><FaCalendarCheck /> Attendance</div>
         <div onClick={() => setTab("reports")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "reports" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "reports" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "reports" ? GOLD : WHITE }}><FaChartBar /> Reports</div>
         <div onClick={() => setTab("offering")} style={{ padding: '12px 16px', borderRadius: 8, background: tab === "offering" ? NAVY_LIGHT : 'transparent', borderLeft: tab === "offering" ? `3px solid ${GOLD}` : 'none', display: 'flex', gap: 10, cursor: 'pointer', marginBottom: 8, color: tab === "offering" ? GOLD : WHITE }}><FaMoneyBillWave /> Offering & Tithe</div>
@@ -171,15 +182,43 @@ export default function App() {
 
         {tab === "visitors" && (
           <div>
-            <div style={{ display: 'flex', gap: 10, background: WHITE, padding: 10, borderRadius: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+            <div style={{ display: 'flex', gap: 10, background: WHITE, padding: 10, borderRadius: 8, marginBottom: 12, flexWrap: 'wrap' }}>
               <div style={{ display: 'flex', gap: 10, alignItems: 'center', flex: 1 }}><FaSearch style={{ color: GOLD }} /><input placeholder="Search visitors" value={visitorSearch} onChange={e => setVisitorSearch(e.target.value)} style={{ border: 'none', outline: 'none', width: '100%' }} /></div>
               <select value={visitorFilter} onChange={e => setVisitorFilter(e.target.value)} style={{ padding: '6px 10px', borderRadius: 6, border: `1px solid ${GOLD}40` }}>
                 <option value="">All - Wants to Join</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option>
               </select>
             </div>
-            <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>RESIDENCE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>VISITS</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>WANTS TO JOIN?</th><th style={{ textAlign: 'left', padding: 12, fontSize: 12, color: GOLD }}>ACTION</th></tr></thead>
-                <tbody>{filteredVisitors.length === 0 ? <tr><td colSpan={7} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors yet. Click Add Visitor</td></tr> : filteredVisitors.map(v => (<tr key={v.id} style={{ borderTop: '1px solid #eee' }}><td style={{ padding: 12, fontWeight: 600 }}>{v.fullName}</td><td style={{ padding: 12 }}>{v.visitDate}</td><td style={{ padding: 12 }}>{v.phoneNumber}</td><td style={{ padding: 12 }}>{v.residence}</td><td style={{ padding: 12 }}><b>{v.visits?.length || 1}</b></td><td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.wantsToJoin === 'Yes' ? '#dcfce7' : v.wantsToJoin === 'No' ? '#f3f4f6' : v.wantsToJoin === 'Unsure' ? '#fef3c7' : '#eee', color: v.wantsToJoin === 'Yes' ? '#16a34a' : v.wantsToJoin === 'No' ? '#666' : '#d97706' }}>{v.wantsToJoin || "-"}</span></td><td style={{ padding: 12 }}><button onClick={() => openEditVisitor(v)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>View</button></td></tr>))}</tbody></table>
+
+            {/* MAIN VISITORS LIST - ACTIVE ONLY */}
+            <div style={{ background: WHITE, borderRadius: 12, overflow: 'auto', marginBottom: 24 }}>
+              <div style={{ padding: '12px 16px', fontWeight: 700, fontSize: 12, color: NAVY, background: '#F8F6F1', borderBottom: '1px solid #eee' }}>ACTIVE VISITORS LIST - {filteredVisitors.length} visitors (converted are deleted from here)</div>
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: NAVY }}><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>NAME</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>PHONE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>RESIDENCE</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>WANTS TO JOIN?</th><th style={{ textAlign: 'left', padding: 12, fontSize: 11, color: GOLD }}>ACTION</th></tr></thead>
+                <tbody>{filteredVisitors.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No active visitors. When converted they are deleted from here but remain in count below.</td></tr> : filteredVisitors.map(v => (<tr key={v.id} style={{ borderTop: '1px solid #eee' }}><td style={{ padding: 12, fontWeight: 600, fontSize: 13 }}>{v.fullName}</td><td style={{ padding: 12, fontSize: 12 }}>{v.visitDate}</td><td style={{ padding: 12, fontSize: 12 }}>{v.phoneNumber}</td><td style={{ padding: 12, fontSize: 12 }}>{v.residence}</td><td style={{ padding: 12 }}><span style={{ padding: '4px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: v.wantsToJoin === 'Yes' ? '#dcfce7' : '#fef3c7' }}>{v.wantsToJoin || "-"}</span></td><td style={{ padding: 12 }}><button onClick={() => openEditVisitor(v)} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, padding: '6px 12px', borderRadius: 6, cursor: 'pointer', fontSize: 12 }}>View</button></td></tr>))}</tbody></table>
+            </div>
+
+            {/* VISITORS COUNT - BELOW SEARCH - ALL TIME HISTORY */}
+            <div style={{ background: WHITE, borderRadius: 12, padding: 16, border: `2px solid ${GOLD}40` }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, flexWrap: 'wrap', gap: 10 }}>
+                <div><div style={{ fontWeight: 800, fontSize: 14, color: NAVY }}>VISITORS COUNT - ALL TIME HISTORY</div><div style={{ fontSize: 11, color: '#888' }}>Shows all visitors we've had even if converted to members • Total: {allVisitorsHistory.length} • Now Members: {allVisitorsHistory.filter(v => v.isConverted).length} • Not yet: {allVisitorsHistory.filter(v => !v.isConverted).length}</div></div>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <div style={{ background: NAVY, color: GOLD, padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Total Ever: {allVisitorsHistory.length}</div>
+                  <div style={{ background: '#dcfce7', color: '#16a34a', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Member now: {allVisitorsHistory.filter(v => v.isConverted).length}</div>
+                  <div style={{ background: '#fef3c7', color: '#d97706', padding: '6px 12px', borderRadius: 8, fontSize: 12, fontWeight: 700 }}>Not yet: {allVisitorsHistory.filter(v => !v.isConverted).length}</div>
+                </div>
+              </div>
+              <div style={{ overflow: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}><thead><tr style={{ background: '#F8F6F1', borderBottom: `2px solid ${GOLD}` }}><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>NAME</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>MONTH JOINED</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>VISIT DATE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>PHONE</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>STATUS</th><th style={{ textAlign: 'left', padding: 10, fontSize: 11, color: NAVY }}>GROUP</th></tr></thead>
+                  <tbody>{allVisitorsHistory.length === 0 ? <tr><td colSpan={6} style={{ padding: 20, textAlign: 'center', color: '#888' }}>No visitors history yet</td></tr> : allVisitorsHistory.slice().reverse().map(v => (
+                    <tr key={v.id} style={{ borderTop: '1px solid #eee', background: v.isConverted ? '#f0fdf4' : 'white' }}>
+                      <td style={{ padding: 10, fontWeight: 600, fontSize: 12 }}>{v.fullName}</td>
+                      <td style={{ padding: 10, fontSize: 12, fontWeight: 700, color: NAVY }}>{v.monthJoined || getMonthName(v.visitDate)}</td>
+                      <td style={{ padding: 10, fontSize: 11 }}>{v.visitDate}</td>
+                      <td style={{ padding: 10, fontSize: 11 }}>{v.phoneNumber}</td>
+                      <td style={{ padding: 10 }}><span style={{ padding: '3px 8px', borderRadius: 20, fontSize: 10, fontWeight: 700, background: v.isConverted ? '#dcfce7' : '#fef3c7', color: v.isConverted ? '#16a34a' : '#d97706' }}>{v.isConverted ? 'Member now' : 'Not yet member'}</span></td>
+                      <td style={{ padding: 10, fontSize: 11 }}>{v.isConverted ? <b style={{ color: NAVY }}>{v.convertedGroup} • {v.convertedDate}</b> : '-'}</td>
+                    </tr>
+                  ))}</tbody></table>
+              </div>
             </div>
           </div>
         )}
@@ -248,11 +287,10 @@ export default function App() {
       {showVisitorModal && selectedVisitor && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 10 }}>
           <div style={{ background: WHITE, borderRadius: 16, width: '100%', maxWidth: isNewVisitorMode ? 380 : 560, maxHeight: '95vh', overflow: 'hidden', display: 'flex', flexDirection: 'column', borderTop: `4px solid ${GOLD}` }}>
-
             {isNewVisitorMode ? (
               <>
                 <div style={{ padding: 20, paddingBottom: 10, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Add Member</h3>
+                  <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, color: NAVY }}>Add Visitor</h3>
                   <button onClick={() => setShowVisitorModal(false)} style={{ border: 'none', background: '#f3f4f6', borderRadius: '50%', width: 28, height: 28, cursor: 'pointer', fontWeight: 700 }}>✕</button>
                 </div>
                 <div style={{ padding: 20, paddingTop: 10, background: WHITE }}>
@@ -263,7 +301,6 @@ export default function App() {
                     <option value="No">No - Not Born Again</option>
                   </select>
                   <button onClick={saveVisitor} style={{ width: '100%', background: NAVY, color: WHITE, border: 'none', padding: 14, borderRadius: 10, fontWeight: 700, fontSize: 15, cursor: 'pointer' }}>Add</button>
-                  <div style={{ fontSize: 11, color: '#888', marginTop: 10, textAlign: 'center' }}>Visit Date: {selectedVisitor.visitDate} (can edit after adding in View)</div>
                 </div>
               </>
             ) : (
@@ -271,7 +308,7 @@ export default function App() {
                 <div style={{ background: NAVY, color: WHITE, padding: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
                     <div style={{ width: 40, height: 40, background: GOLD, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700, color: NAVY }}>{selectedVisitor.fullName?.charAt(0) || "V"}</div>
-                    <div><div style={{ fontWeight: 700, fontSize: 16 }}>Edit Visitor</div><div style={{ fontSize: 11, color: GOLD }}>Patama CMS • Visitor</div></div>
+                    <div><div style={{ fontWeight: 700, fontSize: 16 }}>Edit Visitor</div><div style={{ fontSize: 11, color: GOLD }}>{getMonthName(selectedVisitor.visitDate)} • Not yet member</div></div>
                   </div>
                   <button onClick={() => setShowVisitorModal(false)} style={{ background: WHITE, color: NAVY, border: 'none', padding: '6px 12px', borderRadius: 8, height: 32, fontSize: 12, fontWeight: 700 }}>✕ CLOSE</button>
                 </div>
@@ -287,19 +324,19 @@ export default function App() {
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
                         <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>VISIT DATE *</label><input type="date" value={selectedVisitor.visitDate} max={new Date().toISOString().split('T')[0]} onChange={e => setSelectedVisitor({ ...selectedVisitor, visitDate: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}60`, marginTop: 4, fontSize: 13, background: '#fffbeb' }} /></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>FULL NAME *</label><input value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>PHONE</label><input value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>EMAIL</label><input value={selectedVisitor.email} onChange={e => setSelectedVisitor({ ...selectedVisitor, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Single</option><option>Married</option><option>Divorced</option><option>Widowed</option></select></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>FULL NAME *</label><input value={selectedVisitor.fullName} onChange={e => setSelectedVisitor({ ...selectedVisitor, fullName: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>PHONE</label><input value={selectedVisitor.phoneNumber} onChange={e => setSelectedVisitor({ ...selectedVisitor, phoneNumber: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>EMAIL</label><input value={selectedVisitor.email} onChange={e => setSelectedVisitor({ ...selectedVisitor, email: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>RESIDENCE</label><input value={selectedVisitor.residence} onChange={e => setSelectedVisitor({ ...selectedVisitor, residence: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>SOURCE</label><input value={selectedVisitor.source} onChange={e => setSelectedVisitor({ ...selectedVisitor, source: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} /></div>
                         <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>BORN AGAIN?</label><select value={selectedVisitor.bornAgain} onChange={e => setSelectedVisitor({ ...selectedVisitor, bornAgain: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Yes</option><option>No</option></select></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>RESIDENCE</label><input value={selectedVisitor.residence} onChange={e => setSelectedVisitor({ ...selectedVisitor, residence: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
-                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>SOURCE</label><input value={selectedVisitor.source} onChange={e => setSelectedVisitor({ ...selectedVisitor, source: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }} placeholder="" /></div>
+                        <div><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>MARITAL STATUS</label><select value={selectedVisitor.maritalStatus} onChange={e => setSelectedVisitor({ ...selectedVisitor, maritalStatus: e.target.value })} style={{ width: '100%', padding: 10, borderRadius: 8, border: '1px solid #ccc', marginTop: 4, fontSize: 13 }}><option value="">Select</option><option>Single</option><option>Married</option></select></div>
                         <div style={{ gridColumn: 'span 2' }}><label style={{ fontSize: 10, fontWeight: 700, color: NAVY }}>WANTS TO JOIN? *</label><select value={selectedVisitor.wantsToJoin} onChange={e => setSelectedVisitor({ ...selectedVisitor, wantsToJoin: e.target.value })} style={{ width: '100%', padding: 12, borderRadius: 8, border: `2px solid ${GOLD}`, marginTop: 4, fontSize: 13, fontWeight: 600 }}><option value="">Select</option><option value="Yes">Yes</option><option value="No">No</option><option value="Unsure">Unsure</option></select></div>
                       </div>
 
-                      <div style={{ marginTop: 18, border: `1px solid ${GOLD}30`, borderRadius: 12, padding: 14, background: selectedVisitor.wantsToJoin === "Yes" ? '#dcfce7' : '#f9fafb' }}>
+                      <div style={{ marginTop: 18, border: `1px solid ${GOLD}30`, borderRadius: 12, padding: 14, background: '#f9fafb' }}>
                         <div style={{ fontSize: 11, fontWeight: 700, color: NAVY, marginBottom: 8 }}>CONVERT TO MEMBER</div>
-                        <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>{selectedVisitor.wantsToJoin === "Yes" ? "Select group then convert" : "Enable only when Wants to Join = Yes"}</div>
+                        <div style={{ fontSize: 11, color: '#666', marginBottom: 8 }}>{selectedVisitor.wantsToJoin === "Yes" ? "Select group then convert - will be deleted from Visitors list but remain in count below" : "Enable only when Wants to Join = Yes"}</div>
                         <select value={convertGroup} onChange={e => setConvertGroup(e.target.value)} disabled={selectedVisitor.wantsToJoin !== "Yes"} style={{ width: '100%', padding: 10, borderRadius: 8, border: `1px solid ${GOLD}`, marginBottom: 10, background: WHITE, fontWeight: 600 }}>
                           <option>Choir</option><option>Youth</option><option>Women</option><option>Men</option><option>Children</option>
                         </select>
@@ -315,11 +352,11 @@ export default function App() {
                       <div style={{ fontWeight: 700, fontSize: 11, marginBottom: 10, color: NAVY }}>PREVIOUS VISITS</div>
                       <div style={{ borderLeft: `3px solid ${GOLD}`, paddingLeft: 12, display: 'flex', flexDirection: 'column', gap: 8 }}>
                         {selectedVisitor.visits?.map((vi, i) => (
-                          <div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service} {vi.notes && <div style={{ color: '#666' }}>{vi.notes}</div>}</div>
+                          <div key={i} style={{ background: '#F8F6F1', padding: 10, borderRadius: 8, borderLeft: `4px solid ${NAVY}`, fontSize: 12 }}><b>{vi.date}</b> • {vi.service}</div>
                         ))}
                       </div>
                       <div style={{ background: NAVY, padding: 12, borderRadius: 10, marginTop: 14 }}>
-                        <select value={newVisitForm.service} onChange={e => setNewVisitForm({ ...newVisitForm, service: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6 }}><option>Sunday Service</option><option>Midweek</option><option>Friday Kesha</option><option>Youth Service</option><option>Special Event</option><option>Cell Meeting</option></select>
+                        <select value={newVisitForm.service} onChange={e => setNewVisitForm({ ...newVisitForm, service: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6 }}><option>Sunday Service</option><option>Midweek</option><option>Friday Kesha</option></select>
                         <input placeholder="Notes" value={newVisitForm.notes} onChange={e => setNewVisitForm({ ...newVisitForm, notes: e.target.value })} style={{ width: '100%', padding: 9, borderRadius: 6, marginTop: 6 }} />
                         <button onClick={handleAddVisit} style={{ width: '100%', marginTop: 8, background: GOLD, color: NAVY, padding: 10, borderRadius: 6, fontWeight: 700 }}>+ Add Visit</button>
                       </div>
@@ -355,8 +392,6 @@ export default function App() {
             </div>
             <div style={{ marginTop: 12, fontSize: 14 }}><span style={{ fontWeight: 'bold', color: NAVY }}>Date Joined</span><span style={{ marginLeft: 20, fontWeight: 'bold' }}>{selectedMember.dateJoined}</span></div>
             <div style={{ marginTop: 20 }}><h3 style={{ margin: '0 0 10px', fontSize: 15, color: NAVY }}>Attendance Summary</h3>{(() => { const s = getAttendanceSummary(selectedMember.id); return (<div style={{ background: NAVY, borderRadius: 12, padding: 12, display: 'flex', justifyContent: 'space-around', textAlign: 'center', border: `1px solid ${GOLD}30` }}><div><div style={{ fontSize: 12, color: GOLD }}>Present</div><div style={{ fontSize: 22, fontWeight: 'bold', color: WHITE }}>{s.present}</div></div><div><div style={{ fontSize: 12, color: GOLD }}>Absent</div><div style={{ fontSize: 22, fontWeight: 'bold', color: WHITE }}>{s.absent}</div></div><div><div style={{ fontSize: 12, color: GOLD }}>%</div><div style={{ fontSize: 22, fontWeight: 'bold', color: GOLD }}>{s.percent}%</div></div></div>) })()}</div>
-            <div style={{ marginTop: 20 }}><h3 style={{ fontSize: 15, color: NAVY }}>Emergency Contact</h3><div style={{ border: `1px solid ${GOLD}30`, borderRadius: 10, padding: 12, display: 'flex', flexDirection: 'column', gap: 8 }}><input value={editEmergency.name} onChange={e => setEditEmergency({ ...editEmergency, name: e.target.value })} placeholder="Name" style={{ padding: 8, borderRadius: 6, border: '1px solid #ccc' }} /><div style={{ display: 'flex', gap: 8 }}><input value={editEmergency.relation} onChange={e => setEditEmergency({ ...editEmergency, relation: e.target.value })} placeholder="Relation" style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ccc' }} /><input value={editEmergency.phone} onChange={e => setEditEmergency({ ...editEmergency, phone: e.target.value })} placeholder="Phone" style={{ flex: 1, padding: 8, borderRadius: 6, border: '1px solid #ccc' }} /></div></div></div>
-            <div style={{ marginTop: 20 }}><div style={{ display: 'flex', justifyContent: 'space-between' }}><h3 style={{ margin: 0, fontSize: 15, color: NAVY }}>Family</h3><button onClick={() => setEditFamily([...editFamily, { name: '', relation: '' }])} style={{ background: NAVY, color: GOLD, border: `1px solid ${GOLD}`, borderRadius: 20, padding: '5px 12px', fontSize: 12 }}>+ Add</button></div><div style={{ marginTop: 10 }}>{editFamily.map((f, idx) => (<div key={idx} style={{ display: 'flex', gap: 6, marginBottom: 8, background: '#f9fafb', padding: 8, borderRadius: 8 }}><input value={f.name} onChange={e => { const u = [...editFamily]; u[idx].name = e.target.value; setEditFamily(u) }} placeholder="Name" style={{ flex: 1, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /><input value={f.relation} onChange={e => { const u = [...editFamily]; u[idx].relation = e.target.value; setEditFamily(u) }} placeholder="Relation" style={{ flex: 1, padding: 6, borderRadius: 6, border: '1px solid #ccc' }} /><button onClick={() => setEditFamily(editFamily.filter((_, i) => i !== idx))} style={{ border: 'none', background: '#fee2e2', color: '#dc2626', borderRadius: 6, padding: '6px 8px' }}>X</button></div>))}</div></div>
             <div style={{ display: 'flex', gap: 10, marginTop: 20 }}><button onClick={() => setShowProfile(false)} style={{ flex: 1, padding: 12, borderRadius: 10, border: `1px solid ${GOLD}40`, background: WHITE, color: NAVY }}>Cancel</button><button onClick={saveProfile} style={{ flex: 1, padding: 12, borderRadius: 10, background: NAVY, color: GOLD, fontWeight: 'bold', border: `1px solid ${GOLD}` }}>Save Changes</button></div>
           </div>
         </div>
